@@ -215,7 +215,8 @@ func Set(path string, val *gpb.TypedValue) (*gpb.SetResponse, error) {
 
 	cli := gpb.NewGNMIClient(conn)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*defaultRetryTimeout))
+	defer cancel()
 
 	var updateList []*gpb.Update
 	updateList = append(updateList, &gpb.Update{Path: t.Path, Val: t.Value})
@@ -260,6 +261,7 @@ func Set(path string, val *gpb.TypedValue) (*gpb.SetResponse, error) {
 // Delete does a gNMI Set delete on the provided path
 func Delete(path string) (*gpb.SetResponse, error) {
 	var err error
+	var output *gpb.SetResponse
 	var pathList []*gpb.Path
 	c := Client{}
 	c.New()
@@ -286,7 +288,10 @@ func Delete(path string) (*gpb.SetResponse, error) {
 
 	cli := gpb.NewGNMIClient(conn)
 
-	ctx := context.Background()
+	// ctx := context.Background()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*defaultRetryTimeout))
+	defer cancel()
 
 	setRequest := &gpb.SetRequest{
 		Delete: pathList,
@@ -295,12 +300,36 @@ func Delete(path string) (*gpb.SetResponse, error) {
 	callOpts := []grpc.CallOption{}
 	callOpts = append(callOpts, grpc.WaitForReady(true))
 	log.Infof("Running gNMI SET DELETE...")
-	output, err := cli.Set(ctx, setRequest, callOpts...)
-	//log.Printf("Got response: %s", proto.MarshalTextString(Resp))
-	log.Infof("gNMI SET DELETE run...")
+	for j := 0; j < defaultRetries; j++ {
+		// select {
+		// case <-ctx.Done():
+		// return output, err
+		// default:
+		// retry if context has not been cancelled
+		// }
+
+		output, err = cli.Set(ctx, setRequest, callOpts...)
+		if err != nil {
+			log.Warningf("Set request failed (attempt: %d): %v", j, err)
+			time.Sleep(defaultRetryTimeout)
+			continue
+			// if e, ok := err.(temporary); ok && e.Temporary() {
+			// 	continue
+			// }
+			// return nil, err
+		}
+		// break RETRYLOOP
+		break
+	}
 
 	if err != nil {
-		log.Infof("Set failed: %v", err)
+		log.Errorf("gNMI SET DELETE failed: %v", err)
+	} else {
+		//log.Printf("Got response: %s", proto.MarshalTextString(Resp))
+		log.Infof("gNMI SET DELETE run successfully...")
 	}
+	// output, err := cli.Set(ctx, setRequest, callOpts...)
+	//log.Printf("Got response: %s", proto.MarshalTextString(Resp))
+
 	return output, err
 }
