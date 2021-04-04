@@ -21,8 +21,10 @@ import (
 )
 
 var (
-	defaultUsername = "admin"
-	defaultPassword = "admin"
+	defaultUsername     = "admin"
+	defaultPassword     = "admin"
+	defaultRetries      = 5
+	defaultRetryTimeout = time.Duration(3) * time.Second
 )
 
 // passCred is an username/password implementation of credentials.Credentials.
@@ -192,6 +194,7 @@ func Get(path string) {
 // Set does a gNMI Set, given a path and value in gpb TypedValue format
 func Set(path string, val *gpb.TypedValue) (*gpb.SetResponse, error) {
 	var err error
+	var output *gpb.SetResponse
 	c := Client{}
 	c.New()
 	t := SetTransaction{}
@@ -222,12 +225,34 @@ func Set(path string, val *gpb.TypedValue) (*gpb.SetResponse, error) {
 	callOpts := []grpc.CallOption{}
 	callOpts = append(callOpts, grpc.WaitForReady(true))
 	log.Infof("Running gNMI SET...")
-	output, err := cli.Set(ctx, setRequest, callOpts...)
-	//log.Printf("Got response: %s", proto.MarshalTextString(Resp))
-	log.Infof("gNMI SET run...")
+	// RETRYLOOP:
+	for j := 0; j < defaultRetries; j++ {
+		// select {
+		// case <-ctx.Done():
+		// return output, err
+		// default:
+		// retry if context has not been cancelled
+		// }
+
+		output, err = cli.Set(ctx, setRequest, callOpts...)
+		if err != nil {
+			log.Warningf("Set request failed (attempt: %d): %v", j, err)
+			time.Sleep(defaultRetryTimeout)
+			continue
+			// if e, ok := err.(temporary); ok && e.Temporary() {
+			// 	continue
+			// }
+			// return nil, err
+		}
+		// break RETRYLOOP
+		break
+	}
 
 	if err != nil {
-		log.Infof("Set failed: %v", err)
+		log.Errorf("Set failed: %v", err)
+	} else {
+		//log.Printf("Got response: %s", proto.MarshalTextString(Resp))
+		log.Infof("gNMI SET run successfully...")
 	}
 	return output, err
 }
