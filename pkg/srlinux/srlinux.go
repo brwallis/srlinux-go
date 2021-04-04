@@ -12,7 +12,7 @@ import (
 
 	gpb "github.com/openconfig/gnmi/proto/gnmi"
 
-	gnmi "srlinux.io/go/pkg/gnmi"
+	"github.com/brwallis/srlinux-go/pkg/gnmi"
 
 	log "k8s.io/klog"
 )
