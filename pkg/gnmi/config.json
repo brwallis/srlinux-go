@@ -1,0 +1,61 @@
+{
+  "system": {
+    "gnmi-server": {
+      "admin-state": "enable",
+      "unix-socket": {
+        "admin-state": "enable",
+        "use-authentication": true
+      }
+    }
+  }
+}
+
+#!/usr/bin/env bash
+function arraydiff() {
+  awk 'BEGIN{RS=ORS=" "}
+       {NR==FNR?a[$0]++:a[$0]--}
+       END{for(k in a)if(a[k])print k}' <(echo -n "${!1}") <(echo -n "${!2}")
+}
+
+declare -a cpu_isolated
+declare -a cpu_all
+declare -a cpu_delta
+cpu_from_cmdline="1-17,19-35,37-53,55-71"
+cpu_list=$(lscpu | grep On-line | awk '{print $4}')
+cpu_from_cmdline_space="$(echo ${cpu_from_cmdline} | tr ',' ' ')"
+cpu_list_space="$(echo ${cpu_list} | tr ',' ' ')"
+
+# Build the cpu_all array
+for range in ${cpu_list_space}; do
+  # Split range into start and end
+  start_of_range=$(echo ${range} | awk -F- '{print $1}')
+  echo "  Start of range: ${start_of_range}"
+  end_of_range=$(echo ${range} | awk -F- '{print $2}')
+  echo "  End of range: ${end_of_range}"
+  echo "  Starting iteration..."
+  for cpu in $(seq ${start_of_range} ${end_of_range}); do
+    echo "    Adding CPU ${cpu} to cpu_all"
+    # Append this CPU to the array
+    cpu_all+=(${cpu})
+  done
+done
+
+for range in ${cpu_from_cmdline_space}; do
+  echo "Set: ${range}"
+  # Split range into start and end
+  start_of_range=$(echo ${range} | awk -F- '{print $1}')
+  echo "  Start of range: ${start_of_range}"
+  end_of_range=$(echo ${range} | awk -F- '{print $2}')
+  echo "  End of range: ${end_of_range}"
+  echo "  Starting iteration..."
+  for cpu in $(seq ${start_of_range} ${end_of_range}); do
+    echo "    Adding CPU ${cpu} to cpu_isolated"
+    # Append this CPU to the array
+    cpu_isolated+=(${cpu})
+  done
+done
+
+free_cores=($(arraydiff cpu_all[@] cpu_isolated[@]))
+free_cores_comma=$(echo ${free_cores[@]} | tr ' ' ',')
+echo "Free cores: " ${free_cores[@]}
+echo "Free cores, comma: " ${free_cores_comma}

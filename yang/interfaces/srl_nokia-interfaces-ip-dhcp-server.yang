@@ -1,0 +1,58 @@
+module srl_nokia-interfaces-ip-dhcp-server {
+  yang-version 1.1;
+
+  // namespace
+  namespace "urn:srl_nokia/interfaces/ip/dhcp/server";
+
+  prefix "srl_nokia-if-ip-dhcp-server";
+
+  // import some basic types
+  import srl_nokia-interfaces { prefix srl_nokia-if; }
+  import srl_nokia-interfaces-ip-dhcp-relay { prefix srl_nokia-dhcp-relay; }
+  description
+    "Model to enable DHCP server on IP and IRB subinterfaces";
+
+  revision 2021-02-07 {
+    description
+      "SRLinux 21.6.1";
+  }
+
+  grouping subinterface-dhcpv4-server {
+    container dhcp-server {
+      presence "perform dhcp server related functions under subinterface";
+      leaf dhcp-server-enable {
+        type boolean;
+        default false;
+        must "not(../../srl_nokia-dhcp-relay:dhcp-relay/srl_nokia-dhcp-relay:admin-state = 'enable')" {
+          error-message "can't enable dhcp server when dhcp relay is enabled under subinterface";
+          } 
+        description "Enables/Disables DHCP server function on subinterface";
+      }  
+    }
+  }
+ 
+
+  grouping subinterface-dhcpv6-server {
+    container dhcpv6-server {
+      presence "perform dhcpv6 server related functions under subinterface";
+      leaf dhcpv6-server-enable {
+        type boolean;
+        default false;
+        must '../../srl_nokia-dhcp-relay:dhcp-relay/srl_nokia-dhcp-relay:admin-state = "disable"' {
+          error-message "can't enable dhcp server when dhcp relay is enabled under subinterface";
+          }
+        description "Enables/Disables DHCPv6 server function on subinterface";
+      }
+    }
+  }
+
+ 
+  augment "/srl_nokia-if:interface/srl_nokia-if:subinterface/srl_nokia-if:ipv4" {
+    uses subinterface-dhcpv4-server;
+  }
+
+  augment "/srl_nokia-if:interface/srl_nokia-if:subinterface/srl_nokia-if:ipv6" {
+    uses subinterface-dhcpv6-server;
+  }
+
+}
