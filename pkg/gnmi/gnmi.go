@@ -299,7 +299,7 @@ func Delete(path string) (*gpb.SetResponse, error) {
 	log.Info("Building call options...")
 	callOpts := []grpc.CallOption{}
 	callOpts = append(callOpts, grpc.WaitForReady(true))
-	log.Infof("Running gNMI SET DELETE...")
+	log.Infof("Running gNMI SET DELETE for path %s...", path)
 	for j := 0; j < defaultRetries; j++ {
 		// select {
 		// case <-ctx.Done():
@@ -310,7 +310,7 @@ func Delete(path string) (*gpb.SetResponse, error) {
 
 		output, err = cli.Set(ctx, setRequest, callOpts...)
 		if err != nil {
-			log.Warningf("Set request failed (attempt: %d): %v", j, err)
+			log.Warningf("Delete request failed for path %s (attempt: %d): %v", path, j, err)
 			time.Sleep(defaultRetryTimeout)
 			continue
 			// if e, ok := err.(temporary); ok && e.Temporary() {
@@ -323,10 +323,10 @@ func Delete(path string) (*gpb.SetResponse, error) {
 	}
 
 	if err != nil {
-		log.Errorf("gNMI SET DELETE failed: %v", err)
+		log.Errorf("gNMI SET DELETE failed for path %s: %v", path, err)
 	} else {
 		//log.Printf("Got response: %s", proto.MarshalTextString(Resp))
-		log.Infof("gNMI SET DELETE run successfully...")
+		log.Infof("gNMI SET DELETE run successfully for path %s...", path)
 	}
 	// output, err := cli.Set(ctx, setRequest, callOpts...)
 	//log.Printf("Got response: %s", proto.MarshalTextString(Resp))
