@@ -1,4 +1,4 @@
-module srlinux.io/go
+module github.com/brwallis/srlinux-go
 
 go 1.16
 
