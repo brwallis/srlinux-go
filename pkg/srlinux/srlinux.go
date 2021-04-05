@@ -1,6 +1,7 @@
 package srlinux
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -77,9 +78,8 @@ func GetNetworkInstance(netInstName string) bool {
 func AddNetworkInstance(name string, netInstType string) error {
 	var err error
 	var netInstanceList []NetworkInstance
-	var newNetworkInstance NetworkInstance
 
-	newNetworkInstance = NetworkInstance{
+	newNetworkInstance := NetworkInstance{
 		Name:       name,
 		Type:       netInstType,
 		AdminState: "enable",
@@ -98,9 +98,12 @@ func AddNetworkInstance(name string, netInstType string) error {
 			JsonIetfVal: out,
 		},
 	}
-	gNMINetworkInstancePath := fmt.Sprintf("/")
+	gNMINetworkInstancePath := "/"
 	log.Infof("AddNetworkInstance: Adding instance; name: %s, type: %s, path: %s", name, netInstType, gNMINetworkInstancePath)
-	_, err = gnmi.Set(gNMINetworkInstancePath, gNMINetworkInstance)
+	_, err = gnmi.Set(context.Background(), gNMINetworkInstancePath, gNMINetworkInstance)
+	if err != nil {
+		log.Errorf("gNMI set failed to create network-instance: %s, err: %e", name, err)
+	}
 	return err
 }
 
@@ -155,17 +158,21 @@ func AddInterface(name string, intType string, subIntType string, netInstName st
 	}
 	out, err := json.MarshalIndent(JSONInterface, "", "  ")
 	if err != nil {
-		log.Infof("Unable to Marshal interface: %e", err)
+		log.Errorf("Unable to Marshal interface: %e", err)
+		return err
 	}
 	gNMIInterface := &gpb.TypedValue{
 		Value: &gpb.TypedValue_JsonIetfVal{
 			JsonIetfVal: out,
 		},
 	}
-	gNMIInterfacePath := fmt.Sprintf("/")
+	gNMIInterfacePath := "/"
 	log.Infof("AddInterface: Adding interface; name: %s, type: %s, network-instance: %s", name, intType, netInstName)
-	_, err = gnmi.Set(gNMIInterfacePath, gNMIInterface)
-	//gnmi.Set(gNMIInterfacePath, gNMIInterface)
+	_, err = gnmi.Set(context.Background(), gNMIInterfacePath, gNMIInterface)
+	if err != nil {
+		log.Errorf("gNMI set failed for interface; name: %s, type: %s: %e", name, intType, err)
+		return err
+	}
 	// Add subinterface to the network instance
 	shortSubIntName := newInterface.Name + "." + strconv.Itoa(newSubInterface.Index)
 	newSubInterfaceShort = SubInterfaceShort{
@@ -178,7 +185,8 @@ func AddInterface(name string, intType string, subIntType string, netInstName st
 	}
 	out, err = json.MarshalIndent(JSONNetInstance, "", "  ")
 	if err != nil {
-		log.Infof("Unable to Marshal network instance: %e", err)
+		log.Errorf("Unable to Marshal network instance: %e", err)
+		return err
 	}
 	gNMINetInstance := &gpb.TypedValue{
 		Value: &gpb.TypedValue_JsonIetfVal{
@@ -188,7 +196,7 @@ func AddInterface(name string, intType string, subIntType string, netInstName st
 	gNMINetInstancePath := fmt.Sprintf("/network-instance[name=%s]", netInstName)
 	log.Infof("AddSubInterface: Adding subinterfaces to network-instance %s", netInstName)
 	//gnmi.Set(gNMINetInstancePath, gNMINetInstance)
-	_, err = gnmi.Set(gNMINetInstancePath, gNMINetInstance)
+	_, err = gnmi.Set(context.Background(), gNMINetInstancePath, gNMINetInstance)
 	return err
 }
 
@@ -198,10 +206,18 @@ func DeleteInterface(name string, containerNameShort string, netInstName string)
 	log.Infof("DeleteInterface: Deleting interface; name: %s, network-instance: %s", name, netInstName)
 	// Delete the subinterface
 	path := fmt.Sprintf("/network-instance[name=%s]/interface[name=%s]", netInstName, name+".0")
-	_, err = gnmi.Delete(path)
+	_, err = gnmi.Delete(context.Background(), path)
+	if err != nil {
+		log.Errorf("Unable to delete interface %s from network-instance %s: %e", name, netInstName, err)
+		return err
+	}
 	// Delete the interface
 	path = fmt.Sprintf("/interface[name=%s]", name)
-	_, err = gnmi.Delete(path)
+	_, err = gnmi.Delete(context.Background(), path)
+	if err != nil {
+		log.Errorf("Unable to delete interface %s: %e", name, err)
+		return err
+	}
 
 	return err
 }
@@ -210,7 +226,7 @@ func DeleteInterface(name string, containerNameShort string, netInstName string)
 func AddOrExistsNetworkInstance(conf *types.NetConf, args *skel.CmdArgs) error {
 	var err error
 
-	if found := GetNetworkInstance(conf.HostConf.BridgeConf.BridgeName); found == false {
+	if found := GetNetworkInstance(conf.HostConf.BridgeConf.BridgeName); !found {
 		logging.Debugf("AddOrExistsNetworkInstance(): Bridge %s not found, creating", conf.HostConf.BridgeConf.BridgeName)
 		err = AddNetworkInstance(conf.HostConf.BridgeConf.BridgeName, "mac-vrf")
 

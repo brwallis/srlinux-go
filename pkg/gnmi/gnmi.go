@@ -192,7 +192,7 @@ func Get(path string) {
 }
 
 // Set does a gNMI Set, given a path and value in gpb TypedValue format
-func Set(path string, val *gpb.TypedValue) (*gpb.SetResponse, error) {
+func Set(ctx context.Context, path string, val *gpb.TypedValue) (*gpb.SetResponse, error) {
 	var err error
 	var output *gpb.SetResponse
 	c := Client{}
@@ -215,7 +215,7 @@ func Set(path string, val *gpb.TypedValue) (*gpb.SetResponse, error) {
 
 	cli := gpb.NewGNMIClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*defaultRetryTimeout))
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	var updateList []*gpb.Update
@@ -225,7 +225,7 @@ func Set(path string, val *gpb.TypedValue) (*gpb.SetResponse, error) {
 	}
 	callOpts := []grpc.CallOption{}
 	callOpts = append(callOpts, grpc.WaitForReady(true))
-	log.Infof("Running gNMI SET...")
+	log.Infof("Running gNMI SET, path: %s", path)
 	// RETRYLOOP:
 	for j := 0; j < defaultRetries; j++ {
 		// select {
@@ -237,7 +237,7 @@ func Set(path string, val *gpb.TypedValue) (*gpb.SetResponse, error) {
 
 		output, err = cli.Set(ctx, setRequest, callOpts...)
 		if err != nil {
-			log.Warningf("Set request failed (attempt: %d): %v", j, err)
+			log.Warningf("Set request failed for path: %s (attempt: %d): %v", path, j, err)
 			time.Sleep(defaultRetryTimeout)
 			continue
 			// if e, ok := err.(temporary); ok && e.Temporary() {
@@ -253,13 +253,13 @@ func Set(path string, val *gpb.TypedValue) (*gpb.SetResponse, error) {
 		log.Errorf("Set failed: %v", err)
 	} else {
 		//log.Printf("Got response: %s", proto.MarshalTextString(Resp))
-		log.Infof("gNMI SET run successfully...")
+		log.Infof("gNMI SET run successfully, path: %s", path)
 	}
 	return output, err
 }
 
 // Delete does a gNMI Set delete on the provided path
-func Delete(path string) (*gpb.SetResponse, error) {
+func Delete(ctx context.Context, path string) (*gpb.SetResponse, error) {
 	var err error
 	var output *gpb.SetResponse
 	var pathList []*gpb.Path
@@ -275,11 +275,9 @@ func Delete(path string) (*gpb.SetResponse, error) {
 	}
 	pathList = append(pathList, t.Path)
 
-	log.Info("Creating dial options...")
 	dialOpts := []grpc.DialOption{}
 	dialOpts = append(dialOpts, grpc.WithInsecure())
 	dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(c.authorizedUser))
-	log.Info("Dialing...")
 	conn, err := grpc.Dial(c.Target, dialOpts...)
 	if err != nil {
 		log.Fatalf("Dialing to %q failed: %v", c.Target, err)
@@ -290,16 +288,15 @@ func Delete(path string) (*gpb.SetResponse, error) {
 
 	// ctx := context.Background()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*defaultRetryTimeout))
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	setRequest := &gpb.SetRequest{
 		Delete: pathList,
 	}
-	log.Info("Building call options...")
 	callOpts := []grpc.CallOption{}
 	callOpts = append(callOpts, grpc.WaitForReady(true))
-	log.Infof("Running gNMI SET DELETE for path %s...", path)
+	log.Infof("Running gNMI SET DELETE, path: %s...", path)
 	for j := 0; j < defaultRetries; j++ {
 		// select {
 		// case <-ctx.Done():
