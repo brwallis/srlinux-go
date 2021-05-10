@@ -142,8 +142,8 @@ func (c *Client) New() {
 //
 //}
 
-// Get does a gNMI get on a path
-func Get(path string) {
+// Get does a gNMI get on a path, returning the response
+func Get(path string) (*gpb.GetResponse, error) {
 	c := Client{}
 	c.New()
 	// Build options
@@ -182,13 +182,13 @@ func Get(path string) {
 	callOpts := []grpc.CallOption{}
 	callOpts = append(callOpts, grpc.WaitForReady(true))
 	resp, err := cli.Get(ctx, getRequest, callOpts...)
+	if err != nil {
+		log.Infof("Get failed: %v", err)
+	}
 	//log.Printf("Got response: %s", proto.MarshalTextString(Resp))
 
 	log.Infof("Get result: %v", resp)
-	if err != nil {
-		log.Infof("Set failed: %v", err)
-	}
-
+	return resp, err
 }
 
 // Set does a gNMI Set, given a path and value in gpb TypedValue format
