@@ -1,0 +1,68 @@
+module srl_nokia-console {
+  yang-version 1.1;
+
+  // namespace
+  namespace "urn:srl_nokia/console";
+
+  prefix "srl_nokia-console";
+
+  import srl_nokia-system {
+    prefix srl-system;
+  }
+  import srl_nokia-common {
+    prefix srl-comm;
+  }
+
+  description "This module defines console configuration";
+
+  revision 2019-11-30 {
+    description
+      "SRLinux 19.11.1";
+  }
+
+  typedef console-speed {
+    type enumeration {
+      enum 9600;
+      enum 19200;
+      enum 38400;
+      enum 57600;
+      enum 115200;
+    }
+  }
+
+  grouping console-top {
+    container console {
+      leaf admin-state {
+        type srl-comm:admin-state;
+        default "enable";
+        description
+          "Administratively enable or disable the serial console";
+      }
+      leaf speed {
+        type console-speed;
+        default 115200;
+        description
+          "Set the speed of the serial console";
+      }
+      leaf parity {
+        type boolean;
+        default false;
+        description
+          "Enables or disables parity generation and detection on the serial console";
+      }
+      leaf character-size {
+        type uint8 {
+          range 5..8;
+        }
+        default 8;
+        description
+          "Sets the character size on the serial console";
+      }
+    }
+  }
+
+  augment "/srl-system:system" {
+    uses console-top;
+  }
+
+}

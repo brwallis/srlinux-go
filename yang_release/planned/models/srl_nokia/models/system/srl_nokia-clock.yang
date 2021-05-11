@@ -1,0 +1,71 @@
+module srl_nokia-clock {
+  yang-version 1.1;
+
+  // namespace
+
+  namespace "urn:srl_nokia/clock";
+  prefix srl_nokia-clock;
+
+  import srl_nokia-system {
+    prefix srl-system;
+  }
+  import srl_nokia-common {
+    prefix srl-comm;
+  }
+  import srl_nokia-timezone {
+    prefix srl-tz;
+  }
+  import srl_nokia-extensions {
+    prefix srl-ext;
+  }
+
+  description
+    "This module defines clock configuration and state";
+
+  revision 2021-03-31 {
+    description
+      "SRLinux 21.3.1";
+  }
+  revision 2020-06-30 {
+    description
+      "SRLinux 20.6.1";
+  }
+
+  grouping clock-top {
+    container clock {
+      srl-ext:first-released "19.11.1";
+      description
+        "Top-level container for system clock configuration and state";
+      leaf local-time {
+        srl-ext:delivery-node-override "true";
+        srl-ext:stream-mode "sample=5";
+        srl-ext:first-released "20.6.1";
+        config false;
+        type srl-comm:date-and-time;
+        description
+          "The current system date and time in the local timezone";
+      }
+      leaf universal-time {
+        srl-ext:delivery-node-override "true";
+        srl-ext:stream-mode "sample=5";
+        srl-ext:first-released "20.6.1";
+        config false;
+        type srl-comm:date-and-time;
+        description
+          "The current system date and time, in the UTC timezone";
+      }
+      leaf time-zone {
+        type srl-tz:tzdata-timezone;
+        default "UTC";
+        description
+          "The time zone to use for the system
+
+           Based on IANAs Time Zone database";
+      }
+    }
+  }
+
+  augment "/srl-system:system" {
+    uses clock-top;
+  }
+}

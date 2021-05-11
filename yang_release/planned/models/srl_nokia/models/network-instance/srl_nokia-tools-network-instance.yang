@@ -1,0 +1,34 @@
+module srl_nokia-tools-network-instance {
+  yang-version 1;
+  namespace "urn:srl_nokia/tools-network-instance";
+  prefix srl_nokia-tools-network-instance;
+
+  description
+    "Model for operational commands on system.";
+
+  revision 2021-03-31 {
+    description
+      "SRLinux 21.3.1";
+  }
+  revision 2020-06-30 {
+    description
+      "SRLinux 20.6.1";
+  }
+
+  list network-instance {
+      key "name";
+      leaf name {
+          type string;
+          description
+              "A unique name identifying the network instance";
+      }
+
+      container protocols {
+        description
+          "The routing protocols that are enabled for this
+           network-instance.";
+
+        // Protocols are augmented into this spot
+      }
+  }
+}

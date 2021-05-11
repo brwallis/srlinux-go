@@ -1,0 +1,112 @@
+module srl_nokia-tools-route-table {
+  yang-version 1.1;
+  namespace "urn:srl_nokia/tools-route-table";
+  prefix srl_nokia-tools-route-table;
+
+  import srl_nokia-common { prefix srl_nokia-comm; }
+  import srl_nokia-tools-network-instance { prefix srl_nokia-tools-netinst; }
+  import srl_nokia-features { prefix srl_nokia-feat; }
+
+  description
+    "YANG model for IP route operational commands";
+
+  revision 2021-03-31 {
+    description
+      "SRLinux 21.3.1";
+  }
+
+  grouping route-tools-top {
+    container route-table {
+      container ipv4-unicast {
+        description
+          "The container for the IPv4 unicast routing table of the network instance.";
+        container reinstall {
+          description
+            "Container with options for reinstalling many routes at once.";
+          leaf failed-routes {
+            type empty;
+            description
+              "Instructs fib-mgr to attempt to re-download all the IPv4 routes that were not successfully installed in all of the linecards because some of them had insufficient LPM/LEM resources when the routes were originally learned or configured.";
+          }
+        }
+        list route {
+          key "ipv4-prefix id";
+          leaf ipv4-prefix {
+            type srl_nokia-comm:ipv4-prefix;
+          }
+          leaf id {
+            type uint16;
+            description
+              "An index value representing the relative order of preference of routes for the same prefix. If there is an active route for the prefix it will always be assigned index 0. The route with index 1 is next in order to become active if the route with index 0 is removed.";
+          }
+          leaf reinstall {
+            type empty;
+            description
+              "Instructs fib-mgr to attempt to re-download a specific IPv4 route that may or may not have been successfully installed in all of the linecards when it was originally learned or configured.";
+          }
+        }
+      }
+      container ipv6-unicast {
+        description
+          "The container for the IPv6 unicast routing table of the network instance.";
+        container reinstall {
+          description
+            "Container with options for reinstalling many routes at once.";
+          leaf failed-routes {
+            type empty;
+            description
+              "Instructs fib-mgr to attempt to re-download all the IPv6 routes that were not successfully installed in all of the linecards because some of them had insufficient LPM/LEM resources when the routes were originally learned or configured.";
+          }
+        }
+        list route {
+          key "ipv6-prefix id";
+          leaf ipv6-prefix {
+            type srl_nokia-comm:ipv6-prefix;
+          }
+          leaf id {
+            type uint16;
+            description
+              "An index value representing the relative order of preference of routes for the same prefix. If there is an active route for the prefix it will always be assigned index 0. The route with index 1 is next in order to become active if the route with index 0 is removed.";
+          }
+          leaf reinstall {
+            type empty;
+            description
+              "Instructs fib-mgr to attempt to re-download a specific IPv6 route that may or may not have been successfully installed in all of the linecards when it was originally learned or configured.";
+          }
+        }
+      }
+      list next-hop-group {
+        key index;
+        leaf index {
+          type uint64;
+          description
+            "A system-wide unique identifier of a next-hop-group indirection object (system allocated).";
+        }
+        leaf reinstall {
+          type empty;
+          description
+            "Instructs fib-mgr to attempt to re-download a specific next-hop-group that may or may not have been successfully installed in all of the linecards when it was originally learned or configured.";
+        }
+        list next-hop {
+          key id;
+          leaf id {
+            type uint16 {
+              range 0..1023;
+            }
+            description
+              "A unique identifier of a next-hop member (system allocated).";
+          }
+          leaf reinstall {
+            type empty;
+            description
+              "Instructs fib-mgr to attempt to re-download a specific next-hop belonging to a specific next-hop-group when that next-hop may not have been successfully installed in all of the linecards when it was originally learned or configured.";
+          }
+        }
+      }
+    }
+  }
+  augment "/srl_nokia-tools-netinst:network-instance" {
+      if-feature srl_nokia-feat:future-21-6;
+      uses route-tools-top;
+  }
+}

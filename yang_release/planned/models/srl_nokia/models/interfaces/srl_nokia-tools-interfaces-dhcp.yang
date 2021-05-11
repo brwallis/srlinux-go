@@ -1,0 +1,77 @@
+module srl_nokia-tools-interfaces-dhcp {
+  yang-version 1.1;
+  namespace "urn:srl_nokia/tools-interfaces-DHCPv6";
+  prefix srl_nokia-tools-if-dhcp;
+
+  import srl_nokia-tools-interfaces {
+    prefix srl_nokia_tools-if;
+  }
+
+  description
+    "Model for operational commands related to DHCP and router-discovery.";
+
+  revision 2021-03-31 {
+    description
+      "SRLinux 21.3.1";
+  }
+
+  grouping dhcp-top {
+    container dhcp-client {
+      leaf renew {
+        type empty;
+        description
+          "Triggers the sending of a DHCPREQUEST to renew the current lease immediately, even if time T1 has not been reached yet";
+      }
+      leaf rebind {
+        type empty;
+        description
+          "Triggers the sending of a DHCPREQUEST to rebind the current lease immediately, even if time T2 has not been reached yet";
+      }
+      leaf restart {
+        type empty;
+        description
+          "Causes the DHCP state machine to return to INIT state (send DHCPDISCOVER message). The assigned IP address may change";
+      }
+    }
+  }
+
+  grouping dhcpv6-top {
+    container dhcp-client {
+      leaf renew {
+        type empty;
+        description
+          "Triggers the sending of a RENEW message to renew the current lease immediately, even if time T1 has not been reached yet";
+      }
+      leaf rebind {
+        type empty;
+        description
+          "Triggers the sending of a REBIND message to rebind the current lease immediately, even if time T2 has not been reached yet";
+      }
+      leaf restart {
+        type empty;
+        description
+          "Causes the DHCPv6 state machine to restart (send SOLICIT message). The assigned IPv6 address may change";
+      }
+    }
+  }
+
+  grouping rtr-adv-top {
+    container router-advertisement {
+      container host-role {
+        leaf clear {
+          type empty;
+          description
+            "Causes information from the last received Router Advertisement message to be flushed and triggers the sending of a new Router Solicitation message out the interface. If a default route with owner router-advertisement was installed this will (temporarily) remove it from the route table";
+        }
+      }
+    }
+  }
+
+  augment "/srl_nokia_tools-if:interface/srl_nokia_tools-if:subinterface/srl_nokia_tools-if:ipv4" {
+    uses dhcp-top;
+  }
+  augment "/srl_nokia_tools-if:interface/srl_nokia_tools-if:subinterface/srl_nokia_tools-if:ipv6" {
+    uses dhcpv6-top;
+    uses rtr-adv-top;
+  }
+}

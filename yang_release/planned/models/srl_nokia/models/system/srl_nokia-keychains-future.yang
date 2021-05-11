@@ -1,0 +1,152 @@
+module srl_nokia-keychains-future {
+  yang-version 1.1;
+  namespace "urn:srl_nokia/keychains-future";
+  prefix srl_nokia-keychains-future;
+
+  import srl_nokia-common { prefix srl_nokia-comm; }
+  import srl_nokia-system { prefix srl_nokia-system; }
+
+  description
+    "This module defines configuration and operational state data for authentication keychains used by control plane protocols such as OSPF, ISIS and BGP.";
+
+  revision 2020-06-30 {
+    description
+      "SRLinux 20.6.1";
+  }
+
+  typedef keychain-type {
+    type enumeration {
+      enum "tcp-md5" {
+        description
+          "Keychain intended to be used for TCP-MD5 authentication";
+      }
+      enum "tcp-ao" {
+        description
+          "Keychain intended to be used for TCP-AO authentication";
+      }
+      enum "isis" {
+        description
+          "Keychain intended to be used for authentication of IS-IS PDUs";
+      }
+      enum "ospf" {
+        description
+          "Keychain intended to be used for authentication of OSPFv2 messages";
+      }
+    }
+  }
+
+  typedef algorithm-type {
+    type enumeration {
+      enum "cleartext" {
+        description
+          "The authentication-key is encoded in plaintext. This is supported if the keychain type is ospf or isis";
+      }
+      enum "md5" {
+        description
+          "The authentication-key is used to generate an MD5 digest (RFC 1321). This is supported if the keychain type is ospf or tcp-md5";
+      }
+      enum "hmac-md5" {
+        description
+          "The authentication-key is used to generate a 16-byte (128 bit) MD5 digest using the HMAC algorithm (RFC 2104). This is supported if the keychain type is isis or tcp-ao";
+      }
+      enum "hmac-sha-1" {
+        description
+          "The authentication-key is used to generate a SHA1 digest using the HMAC algorithm (RFC 2104). This is supported if the keychain type is ospf, isis or tcp-ao. The SHA1 message digest is 20 bytes (160 bits) but it may be truncated (to a protocol specific length).";
+      }
+      enum "hmac-sha-256" {
+        description
+          "The authentication-key is used to generate a SHA2 digest using the HMAC algorithm (RFC 2104). This is supported if the keychain type is ospf or isis. The supported SHA-256 variant of SHA2 produces an output of 32 bytes (256 bits).";
+      }
+      enum "aes-128-cmac" {
+        description
+          "The authentication-key is used with the AES-128 encryption algorithm to generate a cipher MAC (RFC 4493). This is supported if the keychain type is tcp-ao";
+      }
+    }
+  }
+
+  grouping authentication-top {
+    description
+      "Configuration and state related to authentication procedures";
+    container authentication {
+      description
+        "Container for protocol authentication options available system wide";
+      list keychain {
+        key "name";
+        description
+          "List of system keychains";
+        leaf name {
+          type srl_nokia-comm:name;
+          description
+            "The user configured name for the keychain";
+        }
+        leaf admin-state {
+          type srl_nokia-comm:admin-state;
+          description
+            "When set to disable, the keychain is inactive. When a protocol refers to a keychain that is inactive, no authentication data is added to the outbound messages and all inbound messages with authentication data are dropped.
+
+            A key chain can also be inactive for other reasons:
+            - no keys are configured
+            - all of the individual keys are administratively disabled
+            - all of the individual keys are inactive because their start-times are too far in the future";
+        }
+        leaf description {
+          type srl_nokia-comm:description;
+          description
+            "The user configured description for the keychain";
+        }
+        leaf tolerance {
+          type uint32;
+          description
+            "Sets the value in seconds for the keychain tolerance value. The receiver of an authenticated message drops it if the message digest does not match any of the valid keys. At time T the valid keys are those with a start-time within +/- Z seconds of T, where Z is this configured tolerance value.";
+        }
+        leaf type {
+          type keychain-type;
+          description
+            "Specifies the intended use of the keychain. The type constrains the set of crypto algorithms that are available to use with each key in the keychain. It is also used ensure that this keychain is only used by protocols for which it is intended.";
+        }
+        list key {
+          key index;
+          description
+            "List of keys in the keychain";
+          leaf index {
+            type uint8;
+            description
+              "Each key in a keychain requires a unique identifier. The index value specifies this identifier.";
+          }
+          leaf admin-state {
+            type srl_nokia-comm:admin-state;
+            description
+              "When the admin-state is enable	the key can be used to validate received messages and sign transmitted messages. However the actual use of the key depends on the current datetime, the configured start-time of this and other keys in the keychain, and the value of the tolerance parameter.
+
+              When set to disable, the key is inactive.  A key can also be inactive if its start-time is too far into the future";
+          }
+          leaf algorithm {
+            type algorithm-type;
+            description
+              "The cryptographic algorithm used with the keying material to secure the messages.";
+          }
+          leaf authentication-key {
+            type string {
+              length "1..25";
+            }
+            description
+              "The secret key.
+
+              The maximum string length is 25 characters, of which a maximum of 20 characters is the secret data and the remaining 5 characters, if provided, must be ‘ hash’ (i.e. one whitespace plus the word hash). The trailing ‘hash’ keyword indicates that the secret data was already encrypted and this is the display version of that secret data, which is a hash of the original data. If the ‘hash’ keyword is omitted the string is assumed to be the actual secret data. Whenever the value of authentication-key is read by any management interface, from any datastore (candidate, running, state) the return value is always the encrypted value – i.e. with the trailing ‘ hash’ characters included.";
+          }
+          leaf start-time {
+            type srl_nokia-comm:date-and-time;
+            description
+              "The datetime when this key becomes usable for signing outgoing messages, however it is only used for this purpose if it is the active key in the keychain with the most recent start-time relative to the current date and time.
+
+              This key becomes usable for validating received messages tolerance seconds before this start-time.";
+          }
+        }
+      }
+    }
+  }
+
+  // augment "/srl_nokia-system:system" {
+  //   uses authentication-top;
+  // }
+}

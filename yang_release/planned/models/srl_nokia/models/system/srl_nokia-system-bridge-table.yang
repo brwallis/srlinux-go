@@ -1,0 +1,95 @@
+module srl_nokia-system-bridge-table {
+  yang-version 1.1;
+  namespace "urn:srl_nokia/system/bridge-table";
+  prefix srl_nokia-system-bridge-table;
+
+  import srl_nokia-system {
+    prefix srl-system;
+  }
+
+  import srl_nokia-common {
+    prefix srl_nokia-comm;
+  }
+
+  import srl_nokia-extensions {
+    prefix srl_nokia-ext;
+  }
+
+  description
+    "This module defines system bridge-table configuration and operational 
+     state data.";
+
+  revision 2021-03-31 {
+    description
+      "SRLinux 21.3.1";
+  }
+  revision 2020-06-30 {
+    description
+      "SRLinux 20.6.1";
+  }
+
+  grouping bridge-table-statistics-top {
+    container statistics {
+      srl_nokia-ext:delivery-node-override true;
+      srl_nokia-ext:stream-mode sample=5;
+      config false;
+      leaf active-entries {
+        type srl_nokia-comm:zero-based-counter64;
+        description
+          "The total number of macs that are active on the system.";
+        srl_nokia-ext:show-importance "high";
+      }
+      leaf total-entries {
+        type srl_nokia-comm:zero-based-counter64;
+        description
+          "The total number of macs, active and inactive, on the system.";
+        srl_nokia-ext:show-importance "high";
+      }
+      leaf failed-entries {
+        type srl_nokia-comm:zero-based-counter64;
+        description
+          "The total number of macs, which have not been programmed on atleast one slot";
+        srl_nokia-ext:show-importance "high";
+      }
+      list mac-type {
+        key "type";
+        description
+          "the type of the mac in the system.";
+        leaf type {
+          type srl_nokia-comm:mac-type;
+          srl_nokia-ext:show-importance "high";
+        }
+        leaf active-entries {
+          type srl_nokia-comm:zero-based-counter64;
+          description
+            "The total number of macs of this type on the system.";
+          srl_nokia-ext:show-importance "high";
+        }
+        leaf total-entries {
+          type srl_nokia-comm:zero-based-counter64;
+          description
+            "The total number of macs of this type , active and inactive, on the system.";
+          srl_nokia-ext:show-importance "high";
+        }
+        leaf failed-entries {
+          type srl_nokia-comm:zero-based-counter64;
+          description
+            "The total number of macs of this type, which have not been programmed on atleast one slot";
+          srl_nokia-ext:show-importance "high";
+        }
+      }
+    }
+  }
+
+  grouping bridge-table-top {
+    container bridge-table {
+      description
+        "system bridge-table information";
+      uses bridge-table-statistics-top;
+    }
+  }
+
+  augment "/srl-system:system" {
+    uses bridge-table-top;
+  }
+}

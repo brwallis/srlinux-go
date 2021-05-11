@@ -1,0 +1,62 @@
+module srl_nokia-tools-aaa {
+  yang-version 1.1;
+  namespace "urn:srl_nokia/tools-aaa";
+  prefix srl-tools-tls;
+
+  import srl_nokia-tools-system {
+    prefix srl-tools-system;
+  }
+  import srl_nokia-extensions {
+    prefix srl-ext;
+  }
+
+  description
+    "This module defines operational commands related to AAA.";
+
+  revision 2021-03-31 {
+    description
+      "SRLinux 21.3.1";
+  }
+  revision 2020-06-30 {
+    description
+      "SRLinux 20.6.1";
+  }
+
+  grouping aaa-authentication-top {
+    description
+      "Top-level grouping for operational commands related to authentication";
+    container authentication {
+      description
+        "Top-level container for operational commands related to authentication";
+      list session {
+        key "id";
+        config false;
+        description
+          "List of active sessions in the system";
+        leaf id {
+          type uint32;
+          description
+            "System generated session ID";
+        }
+        leaf clear {
+          type empty;
+          description
+            "Clears this session from the system, disconnecting the user";
+        }
+      }
+    }
+  }
+
+  grouping aaa-top {
+    container aaa {
+      srl-ext:first-released "20.4.1";
+      description
+        "Top-level container for operational commands related to AAA";
+      uses aaa-authentication-top;
+    }
+  }
+
+  augment "/srl-tools-system:system" {
+    uses aaa-top;
+  }
+}

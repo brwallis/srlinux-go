@@ -1,0 +1,68 @@
+module srl_nokia-segment-routing {
+
+    yang-version 1.1;
+
+    // namespace
+    namespace "urn:srl_nokia/segment-routing";
+
+    prefix "srl_nokia-sr";
+
+    import srl_nokia-network-instance { prefix srl_nokia-netinst; }
+    import srl_nokia-system { prefix srl_nokia-system; }
+    import srl_nokia-mpls-label-management { prefix srl_nokia-mplslbl; }
+    import srl_nokia-mpls { prefix srl_nokia-mpls; }
+
+    description
+        "This YANG file covers segment routing configuration and state at the network-instance level.";
+
+  revision 2021-03-31 {
+    description
+      "SRLinux 21.3.1";
+  }
+
+    grouping segment-routing-top {
+        container segment-routing {
+            description
+                "Container with segment routing configuration options";
+            container mpls {
+                presence "Enable segment routing based on the MPLS dataplane";
+                description
+                    "Adding this container activates datapath support for SR-MPLS";
+                must '(/srl_nokia-netinst:network-instance[srl_nokia-netinst:name = current()/../../srl_nokia-netinst:name]/srl_nokia-netinst:type = "srl_nokia-netinst:default")';
+                must "../../srl_nokia-mpls:mpls/srl_nokia-mpls:admin-state = 'true'" {
+                    error-message "Precondition failed: MPLS must be enabled";
+                }
+                must "global-block/label-range" {
+                    error-message "SRGB label-range must be defined.";
+                }
+                container global-block {
+                    description
+                        "Container with SRGB configuration that is applicable to all IGP protocol instances";
+                    leaf label-range {
+                        mandatory true;
+                        type leafref {
+                            path "/srl_nokia-system:system/srl_nokia-mplslbl:mpls/srl_nokia-mplslbl:label-ranges/srl_nokia-mplslbl:static/srl_nokia-mplslbl:name";
+                        }
+                        description
+                            "Reference to a static label range";
+                    }
+                    leaf label-range-status {
+                        config false;
+                        type enumeration {
+                            enum "available";
+                            enum "unavailable";
+                        }
+                        description
+                            "Status of the label block.
+                            
+                            The label block may show as unavailable if there is pending cleanup.";
+                    }
+                }
+            }
+        }
+    }
+
+    augment "/srl_nokia-netinst:network-instance" {
+        uses segment-routing-top;
+    }
+}

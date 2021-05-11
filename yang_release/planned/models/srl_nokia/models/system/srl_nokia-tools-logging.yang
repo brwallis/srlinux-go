@@ -1,0 +1,65 @@
+module srl_nokia-tools-logging {
+  yang-version 1.1;
+  namespace "urn:srl_nokia/tools-logging";
+  prefix srl_nokia-tools-logging;
+
+  import srl_nokia-tools-system {
+    prefix srl-tools-system;
+  }
+
+  description
+    "Model for operational commands related to system logging";
+
+  revision 2021-03-31 {
+    description
+      "SRLinux 21.3.1";
+  }
+
+  grouping tools-logging-top {
+    typedef restricted-file-name-type {
+      // Disallows (a) one single period character, (b) a pair of period characters, and (c) anything with slashes
+      type string {
+        pattern '([^./][^/]*)|(\.[^\./]+)|(\.\.[^/])+';
+      }
+    }
+
+    container logging {
+      description
+        "Top-level grouping for logging operational commands";
+      list buffer {
+        key "buffer-name";
+        description
+          "Operation commands on buffers";
+        leaf buffer-name {
+          type restricted-file-name-type;
+          description
+            "Name of local log buffer";
+        }
+        leaf clear {
+          type empty;
+          description
+            "Clear the log buffer, including any rolled over history";
+        }
+      }
+      list file {
+        key "file-name";
+        description
+          "Operation commands on files";
+        leaf file-name {
+          type restricted-file-name-type;
+          description
+            "Name of local log file";
+        }
+        leaf clear {
+          type empty;
+          description
+            "Clear the log file, including any rolled over history";
+        }
+      }
+    }
+  }
+
+  augment "/srl-tools-system:system" {
+    uses tools-logging-top;
+  }
+}

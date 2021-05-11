@@ -1,0 +1,92 @@
+module srl_nokia-system-network-instance {
+
+  yang-version 1.1;
+
+  namespace "urn:srl_nokia/system-network-instance";
+  prefix "srl_nokia-system-netinst";
+
+  import srl_nokia-common {
+      prefix srl_nokia-comm;
+  }
+  import srl_nokia-extensions {
+    prefix srl_nokia-ext;
+  }
+  import srl_nokia-features {
+    prefix srl-feat;
+  }
+  import srl_nokia-system {
+    prefix srl_nokia-system;
+  }
+
+  description
+    "This yang file models configuration and state of the system network-instance.";
+
+  revision 2021-03-31 {
+    description
+      "SRLinux 21.3.1";
+  }
+
+  grouping system-network-instance-top {
+    description
+      "Top-level grouping containing the system network-instance configuration and state.";
+    container network-instance {
+      presence "Configure the system network-instance.";
+      container vxlan {
+        description 
+          "VXLAN configuration applied to all network-instances.";
+        container ifl-inner-ethernet-header {
+          description
+            "Configuration and State of the inner ethernet header used in VXLAN packets sent on an IP-VRF with BGP-EVPN Interface-less model enabled.";
+          leaf source-mac {
+            config false;
+            srl_nokia-ext:show-importance "high";
+            type srl_nokia-comm:mac-address;
+            description
+              "The source-mac address used in the inner ethernet header of VXLAN packets originated for IP-VRF network-instances 
+               enabled with the BGP-EVPN Interface-less model.";
+          }
+        }
+        /* Future:
+        leaf destination-udp-port {
+          type union {
+            type uint16 {
+              range 0..65535;
+            }
+            type enumeration {
+              enum "vxlan";
+              enum "vxlan-gpe";
+            }
+          }
+          default vxlan;
+          description
+            "The destination UDP port used for VXLAN packets. The value 'vxlan' corresponds to 4789, whereas 'vxlan-gpe' corresponds to 4790.";
+        }
+        leaf ingress-replicated-bum-flag {
+          type boolean;
+          default false;
+          description
+            "When enabled, the ingress-replicated-bum-flag is set when transmitting BUM frames over VXLAN and processed when receiving VXLAN
+             packets for a network-instance of type MAC-VRF.
+             
+             This feature avoids packet duplication in EVPN all-active multi-homing scenarios where a remote PE floods VXLAN-encapsulated unknown
+             unicast frames to two PEs attached to the same all-active Ethernet Segment. If both PEs have the destination MAC in their mac-table,
+             both will forward to the multi-homed CE. The CE will get duplicate frames.";
+          reference "draft-ietf-nvo3-vxlan-gpe";
+        }
+        */
+      }
+      container protocols {
+        description
+          "The routing protocols that are enabled for this
+           network-instance.";
+        container evpn {
+          presence "System network-instance evpn configuration and state.";
+          if-feature "srl-feat:evpn"; 
+        }
+      }
+    }
+  }
+  augment "/srl_nokia-system:system" {
+    uses system-network-instance-top;
+  }
+}

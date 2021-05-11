@@ -1,0 +1,105 @@
+module srl_nokia-tools-traffic-monitor {
+  yang-version 1.1;
+  namespace "urn:srl_nokia/tools-traffic-monitor";
+  prefix srl_nokia-tools-traffic-monitor;
+
+  import srl_nokia-tools-system {
+    prefix srl-tools-system;
+  }
+  import srl_nokia-common {
+    prefix srl_nokia-comm;
+  }
+  import srl_nokia-packet-match-types {
+    prefix srl_nokia-pkt-match-types;
+  }
+
+  description
+    "Model for operational commands for traffic-monitor tool";
+
+  revision 2021-03-31 {
+    description
+      "SRLinux 21.3.1";
+  }
+
+  grouping tools-traffic-monitor-top {
+    description
+      " Top-level grouping for traffic-monitor tools command";
+  		
+    typedef restricted-file-name-type {
+      // Disallows (a) one single period character, (b) a pair of period characters, and (c) anything with slashes
+      type string {
+        pattern '([^./][^/]*)|(\.[^\./]+)|(\.\.[^/])+';
+      }
+    }
+
+    container packet-trace {
+      description
+        "Top-level grouping for packet-trace operational commands";
+      
+      container destination-address {
+      	leaf prefix {
+      		type srl_nokia-comm:ip-prefix;
+      		 
+      	}
+      	description
+      	  "Specifies the matching destination IP prefix/netmask-length";
+      }
+      container destination-port {
+      	leaf port {
+      		type uint16 {
+          	range 0..65535;
+          } 
+      	}
+      	description
+      	    "Destination port number or range (the protocol parameter must also be configured if this parameter is specified)" ;
+      }
+      container source-address {
+      	leaf prefix {
+      		type srl_nokia-comm:ip-prefix;
+      		 
+      	}
+      	description
+      	  "Specifies the matching source IP prefix/netmask-length";
+      }
+      container source-port {
+      	leaf port {
+      		type uint16 {
+          	range 0..65535;
+          } 
+          description
+      	    "Source port number or range (the protocol parameter must also be configured if this parameter is specified)" ;
+      	}
+      }
+      container output-file {
+      	leaf file {
+      	  type restricted-file-name-type;
+      	  description
+      	    "Redirects output in pcap format to specified local file location (specified filename should include .pcap extension)" ;
+      	}
+      }
+      container protocol { 
+      	leaf proto-val {
+      	  description
+            "Specifies the matching IPv4 protocol or IPv6 next-header value";
+          type srl_nokia-pkt-match-types:ip-protocol-type;
+      	}
+      }    
+      leaf hex-output {
+        type empty;
+          description
+            "Outputs packet data in hex and ASCII dump (Packet Bytes) format"; 
+      }	    
+      leaf verbose {
+        type empty;
+          description
+            "Displays output in a more verbose packet tree format (Packet Details)";       
+      }
+
+    } //container packet-trace
+  }
+
+  augment "/srl-tools-system:system" {
+    uses tools-traffic-monitor-top;
+    // + traffic-monitor [destination-address <value>] [destination-port <value>] [hexdump] [output-file <value>] [protocol <value>] [source-address <value>] [source-port <value>] [verbose]
+  }
+}

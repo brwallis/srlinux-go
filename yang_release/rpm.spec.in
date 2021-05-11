@@ -1,0 +1,74 @@
+%define _debugsource_template %{nil}
+%define _topdir      @CPACK_RPM_TOP_DIR@
+%define _sourcedir   %{_topdir}/SOURCES
+%define _builddir    %{_topdir}/BUILD
+
+%define _srlinuxdir  @SRLINUX_INSTALL_PREFIX@
+%define _destbindir  @SRLINUX_BINARY_INSTALL_PREFIX@
+%define _destlibdir  @SRLINUX_LIB_INSTALL_PREFIX@
+%define _destfiledir @SRLINUX_FILE_INSTALL_PREFIX@
+%define _destcfgdir @SRLINUX_CFG_INSTALL_PREFIX@
+
+%define _srcbindir   @CMAKE_RUNTIME_OUTPUT_DIRECTORY@
+%define _srclibdir   @CMAKE_LIBRARY_OUTPUT_DIRECTORY@
+
+%define _target      @target@
+%define _app_source_dir  @CMAKE_CURRENT_SOURCE_DIR@
+%define _executable    %{nil}
+%define _shared_lib    %{nil}
+%define _file_permissions_user @SRLINUX_USER@
+%define _file_permissions_group @SRLINUX_USER@
+%define _yang_output_dir %{_destfiledir}
+
+Name:          %{_target}
+Version:       @CPACK_PACKAGE_VERSION@
+Release:       @CPACK_RPM_PACKAGE_RELEASE@
+Summary:       Summary of package
+Group:         @CPACK_RPM_PACKAGE_GROUP@
+License:       @CPACK_RPM_PACKAGE_LICENSE@
+Vendor:        @CPACK_PACKAGE_VENDOR@
+
+Prefix:        @CPACK_PACKAGING_INSTALL_PREFIX@
+BuildRoot:     %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
+BuildRequires: /bin/mkdir
+BuildArch:     @CPACK_RPM_PACKAGE_ARCHITECTURE@
+
+%description
+Description of the package goes here.
+
+%prep
+#%setup -q
+
+%build
+
+
+%install
+mkdir -p  %{buildroot}%{_yang_output_dir}
+cd %{_app_source_dir}
+cp -a models %{buildroot}%{_yang_output_dir}
+cd -
+
+%pre
+# Pre-install steps go here.
+
+%post
+# Post-install steps go here.
+
+%preun
+# Steps prior to uninstall go here.
+
+%postun
+# Steps after uninstall go here.
+
+%clean
+%{__rm} -rf %{buildroot}
+
+%files
+%defattr(-,%{_file_permissions_user},%{_file_permissions_group},0755)
+%{_yang_output_dir}
+
+%debug_package
+
+%changelog
+* Mon Jun 11 2018 - ajsilves
+- Initial draft spec file
