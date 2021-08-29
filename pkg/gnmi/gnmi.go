@@ -25,6 +25,13 @@ var (
 	defaultPassword     = "admin"
 	defaultRetries      = 5
 	defaultRetryTimeout = time.Duration(3) * time.Second
+	defaultEncoding     = "JSON_IETF"
+	defaultCallOptions  = []grpc.CallOption{
+		grpc.WaitForReady(true),
+	}
+	defaultDialOptions = []grpc.DialOption{
+		grpc.WithInsecure(),
+	}
 )
 
 // passCred is an username/password implementation of credentials.Credentials.
@@ -114,6 +121,12 @@ type Client struct {
 	EnableTLS bool
 	Redial    Duration
 
+	Encoding    string
+	DialOptions []grpc.DialOption
+	CallOptions []grpc.CallOption
+	Connection  *grpc.ClientConn
+	GNMI        gpb.GNMIClient
+
 	authorizedUser credentials.PerRPCCredentials
 }
 
@@ -129,38 +142,41 @@ func (c *Client) New() {
 		c.Target = "unix:///opt/srlinux/var/run/sr_gnmi_server"
 	}
 	if c.Username == "" {
-		c.Username = "admin"
+		c.Username = defaultUsername
 	}
 	if c.Password == "" {
-		c.Password = "admin"
+		c.Password = defaultPassword
+	}
+	if c.Encoding == "" {
+		c.Encoding = defaultEncoding
+	}
+	if len(c.DialOptions) == 0 {
+		c.DialOptions = defaultDialOptions
+	}
+	if len(c.CallOptions) == 0 {
+		c.CallOptions = defaultCallOptions
 	}
 	c.authorizedUser = newPassCred(c.Username, c.Password, c.EnableTLS)
+	c.DialOptions = append(c.DialOptions, grpc.WithPerRPCCredentials(c.authorizedUser))
 }
 
-// ClientInit initializes a client
-//func ClientInit() {
-//
-//}
-
-// Get does a gNMI get on a path, returning the response
-func Get(path string) (*gpb.GetResponse, error) {
-	c := Client{}
-	c.New()
-	// Build options
-	dialOpts := []grpc.DialOption{}
-	dialOpts = append(dialOpts, grpc.WithInsecure())
-	dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(c.authorizedUser))
-	conn, err := grpc.Dial(c.Target, dialOpts...)
+// Dial dials a gRPC connection and returns a reference to it
+func (c *Client) Dial() (*grpc.ClientConn, error) {
+	conn, err := grpc.Dial(c.Target, c.DialOptions...)
 	if err != nil {
 		log.Fatalf("Dialing to %q failed: %v", c.Target, err)
 	}
-	defer conn.Close()
+	return conn, err
+}
 
-	cli := gpb.NewGNMIClient(conn)
+// InitGNMI initializes a gNMI client over a gRPC connection
+func (c *Client) InitGNMI(conn *grpc.ClientConn) *gpb.GNMIClient {
+	client := gpb.NewGNMIClient(conn)
+	return &client
+}
 
-	ctx := context.Background()
-
-	encoding, ok := gpb.Encoding_value["JSON_IETF"]
+func CheckEncoding(encodingString string) int32 {
+	encoding, ok := gpb.Encoding_value[encodingString]
 	if !ok {
 		var gnmiEncodingList []string
 		for _, name := range gpb.Encoding_name {
@@ -168,6 +184,18 @@ func Get(path string) (*gpb.GetResponse, error) {
 		}
 		log.Fatalf("Supported encodings: %s", strings.Join(gnmiEncodingList, ", "))
 	}
+	return encoding
+}
+
+// Get does a gNMI get on a path, returning the response
+func Get(path string) (*gpb.GetResponse, error) {
+	c := Client{}
+	c.New()
+	encoding := CheckEncoding(c.Encoding)
+	c.Connection, _ = c.Dial()
+	defer c.Connection.Close()
+
+	ctx := context.Background()
 
 	var gNMIPaths []*gpb.Path
 	gNMIPath, err := xpath.ToGNMIPath(path)
@@ -179,9 +207,8 @@ func Get(path string) (*gpb.GetResponse, error) {
 		Encoding: gpb.Encoding(encoding),
 		Path:     gNMIPaths,
 	}
-	callOpts := []grpc.CallOption{}
-	callOpts = append(callOpts, grpc.WaitForReady(true))
-	resp, err := cli.Get(ctx, getRequest, callOpts...)
+	c.GNMI = *c.InitGNMI(c.Connection)
+	resp, err := c.GNMI.Get(ctx, getRequest, c.CallOptions...)
 	if err != nil {
 		log.Infof("Get failed: %v", err)
 	}
@@ -191,59 +218,18 @@ func Get(path string) (*gpb.GetResponse, error) {
 	return resp, err
 }
 
-// Set does a gNMI Set, given a path and value in gpb TypedValue format
-func Set(ctx context.Context, path string, val *gpb.TypedValue) (*gpb.SetResponse, error) {
+// Set does a gNMI Set, which can be used for both updates and deletes
+func Set(ctx context.Context, path string, c *Client, setRequest *gpb.SetRequest) (*gpb.SetResponse, error) {
 	var err error
 	var output *gpb.SetResponse
-	c := Client{}
-	c.New()
-	t := SetTransaction{}
-	// Build options
-	t.Path, err = xpath.ToGNMIPath(path)
-	t.Value = val
-	if err != nil {
-		log.Fatalf("error in parsing xpath %q to gnmi path", path)
-	}
-	dialOpts := []grpc.DialOption{}
-	dialOpts = append(dialOpts, grpc.WithInsecure())
-	dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(c.authorizedUser))
-	conn, err := grpc.Dial(c.Target, dialOpts...)
-	if err != nil {
-		log.Fatalf("Dialing to %q failed: %v", c.Target, err)
-	}
-	defer conn.Close()
 
-	cli := gpb.NewGNMIClient(conn)
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	var updateList []*gpb.Update
-	updateList = append(updateList, &gpb.Update{Path: t.Path, Val: t.Value})
-	setRequest := &gpb.SetRequest{
-		Update: updateList,
-	}
-	callOpts := []grpc.CallOption{}
-	callOpts = append(callOpts, grpc.WaitForReady(true))
-	log.Infof("Running gNMI SET, path: %s", path)
 	// RETRYLOOP:
 	for j := 0; j < defaultRetries; j++ {
-		// select {
-		// case <-ctx.Done():
-		// return output, err
-		// default:
-		// retry if context has not been cancelled
-		// }
-
-		output, err = cli.Set(ctx, setRequest, callOpts...)
+		output, err = c.GNMI.Set(ctx, setRequest, c.CallOptions...)
 		if err != nil {
 			log.Warningf("Set request failed for path: %s (attempt: %d): %v", path, j, err)
 			time.Sleep(defaultRetryTimeout)
 			continue
-			// if e, ok := err.(temporary); ok && e.Temporary() {
-			// 	continue
-			// }
-			// return nil, err
 		}
 		// break RETRYLOOP
 		break
@@ -255,6 +241,82 @@ func Set(ctx context.Context, path string, val *gpb.TypedValue) (*gpb.SetRespons
 		//log.Printf("Got response: %s", proto.MarshalTextString(Resp))
 		log.Infof("gNMI SET run successfully, path: %s", path)
 	}
+	return output, err
+}
+
+// Subscribe subscribes to a path
+func Subscribe(path string) (gpb.GNMI_SubscribeClient, error) {
+	var err error
+	c := Client{}
+	c.New()
+	c.Connection, _ = c.Dial()
+	defer c.Connection.Close()
+
+	c.GNMI = *c.InitGNMI(c.Connection)
+	ctx := context.Background()
+
+	encoding := CheckEncoding(defaultEncoding)
+
+	xPath, err := xpath.ToGNMIPath(path)
+	if err != nil {
+		log.Fatalf("error in parsing xpath %q to gnmi path", "/interface[name=*]")
+	}
+
+	subsList := []*gpb.Subscription{
+		&gpb.Subscription{
+			Path: xPath,
+		},
+	}
+
+	req := &gpb.SubscribeRequest_Subscribe{
+		Subscribe: &gpb.SubscriptionList{
+			Encoding:     gpb.Encoding(encoding),
+			Subscription: subsList,
+		},
+	}
+
+	gnmiSubscribeRequest := &gpb.SubscribeRequest{
+		Request: req,
+	}
+
+	stream, err := c.GNMI.Subscribe(ctx)
+	if err != nil {
+		log.Fatalf("Get failed: %v", err)
+	}
+
+	if err := stream.Send(gnmiSubscribeRequest); err != nil {
+		log.Fatalf("Failed to send a subscribe request for interface: %v", err)
+	}
+
+	return stream, err
+}
+
+// Set does a gNMI Set, given a path and value in gpb TypedValue format
+func Update(ctx context.Context, path string, val *gpb.TypedValue) (*gpb.SetResponse, error) {
+	var err error
+	var output *gpb.SetResponse
+	c := Client{}
+	c.New()
+	t := SetTransaction{}
+	// Build options
+	t.Path, err = xpath.ToGNMIPath(path)
+	t.Value = val
+	if err != nil {
+		log.Fatalf("error in parsing xpath %q to gnmi path", path)
+	}
+	c.Connection, _ = c.Dial()
+	defer c.Connection.Close()
+	c.GNMI = *c.InitGNMI(c.Connection)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var updateList []*gpb.Update
+	updateList = append(updateList, &gpb.Update{Path: t.Path, Val: t.Value})
+	setRequest := &gpb.SetRequest{
+		Update: updateList,
+	}
+	log.Infof("Running gNMI SET, path: %s", path)
+	output, err = Set(ctx, path, &c, setRequest)
 	return output, err
 }
 
@@ -275,58 +337,16 @@ func Delete(ctx context.Context, path string) (*gpb.SetResponse, error) {
 	}
 	pathList = append(pathList, t.Path)
 
-	dialOpts := []grpc.DialOption{}
-	dialOpts = append(dialOpts, grpc.WithInsecure())
-	dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(c.authorizedUser))
-	conn, err := grpc.Dial(c.Target, dialOpts...)
-	if err != nil {
-		log.Fatalf("Dialing to %q failed: %v", c.Target, err)
-	}
-	defer conn.Close()
-
-	cli := gpb.NewGNMIClient(conn)
-
-	// ctx := context.Background()
-
+	c.Connection, _ = c.Dial()
+	defer c.Connection.Close()
+	c.GNMI = *c.InitGNMI(c.Connection)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	setRequest := &gpb.SetRequest{
 		Delete: pathList,
 	}
-	callOpts := []grpc.CallOption{}
-	callOpts = append(callOpts, grpc.WaitForReady(true))
 	log.Infof("Running gNMI SET DELETE, path: %s...", path)
-	for j := 0; j < defaultRetries; j++ {
-		// select {
-		// case <-ctx.Done():
-		// return output, err
-		// default:
-		// retry if context has not been cancelled
-		// }
-
-		output, err = cli.Set(ctx, setRequest, callOpts...)
-		if err != nil {
-			log.Warningf("Delete request failed for path %s (attempt: %d): %v", path, j, err)
-			time.Sleep(defaultRetryTimeout)
-			continue
-			// if e, ok := err.(temporary); ok && e.Temporary() {
-			// 	continue
-			// }
-			// return nil, err
-		}
-		// break RETRYLOOP
-		break
-	}
-
-	if err != nil {
-		log.Errorf("gNMI SET DELETE failed for path %s: %v", path, err)
-	} else {
-		//log.Printf("Got response: %s", proto.MarshalTextString(Resp))
-		log.Infof("gNMI SET DELETE run successfully for path %s...", path)
-	}
-	// output, err := cli.Set(ctx, setRequest, callOpts...)
-	//log.Printf("Got response: %s", proto.MarshalTextString(Resp))
-
+	output, err = Set(ctx, path, &c, setRequest)
 	return output, err
 }

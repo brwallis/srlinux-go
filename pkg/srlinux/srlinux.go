@@ -100,7 +100,7 @@ func AddNetworkInstance(name string, netInstType string) error {
 	}
 	gNMINetworkInstancePath := "/"
 	log.Infof("AddNetworkInstance: Adding instance; name: %s, type: %s, path: %s", name, netInstType, gNMINetworkInstancePath)
-	_, err = gnmi.Set(context.Background(), gNMINetworkInstancePath, gNMINetworkInstance)
+	_, err = gnmi.Update(context.Background(), gNMINetworkInstancePath, gNMINetworkInstance)
 	if err != nil {
 		log.Errorf("gNMI set failed to create network-instance: %s, err: %e", name, err)
 	}
@@ -168,7 +168,7 @@ func AddInterface(name string, intType string, subIntType string, netInstName st
 	}
 	gNMIInterfacePath := "/"
 	log.Infof("AddInterface: Adding interface; name: %s, type: %s, network-instance: %s", name, intType, netInstName)
-	_, err = gnmi.Set(context.Background(), gNMIInterfacePath, gNMIInterface)
+	_, err = gnmi.Update(context.Background(), gNMIInterfacePath, gNMIInterface)
 	if err != nil {
 		log.Errorf("gNMI set failed for interface; name: %s, type: %s: %e", name, intType, err)
 		return err
@@ -196,7 +196,7 @@ func AddInterface(name string, intType string, subIntType string, netInstName st
 	gNMINetInstancePath := fmt.Sprintf("/network-instance[name=%s]", netInstName)
 	log.Infof("AddSubInterface: Adding subinterfaces to network-instance %s", netInstName)
 	//gnmi.Set(gNMINetInstancePath, gNMINetInstance)
-	_, err = gnmi.Set(context.Background(), gNMINetInstancePath, gNMINetInstance)
+	_, err = gnmi.Update(context.Background(), gNMINetInstancePath, gNMINetInstance)
 	return err
 }
 
