@@ -121,11 +121,12 @@ type Client struct {
 	EnableTLS bool
 	Redial    Duration
 
-	Encoding    string
-	DialOptions []grpc.DialOption
-	CallOptions []grpc.CallOption
-	Connection  *grpc.ClientConn
-	GNMI        gpb.GNMIClient
+	Encoding        string
+	DialOptions     []grpc.DialOption
+	CallOptions     []grpc.CallOption
+	Connection      *grpc.ClientConn
+	GNMI            gpb.GNMIClient
+	SubscribeClient gpb.GNMI_SubscribeClient
 
 	authorizedUser credentials.PerRPCCredentials
 }
@@ -245,12 +246,11 @@ func Set(ctx context.Context, path string, c *Client, setRequest *gpb.SetRequest
 }
 
 // Subscribe subscribes to a path
-func Subscribe(path string) (gpb.GNMI_SubscribeClient, error) {
+func Subscribe(path string) (*Client, error) {
 	var err error
 	c := Client{}
 	c.New()
 	c.Connection, _ = c.Dial()
-	defer c.Connection.Close()
 
 	c.GNMI = *c.InitGNMI(c.Connection)
 	ctx := context.Background()
@@ -279,16 +279,16 @@ func Subscribe(path string) (gpb.GNMI_SubscribeClient, error) {
 		Request: req,
 	}
 
-	stream, err := c.GNMI.Subscribe(ctx)
+	c.SubscribeClient, err = c.GNMI.Subscribe(ctx)
 	if err != nil {
 		log.Fatalf("Get failed: %v", err)
 	}
 
-	if err := stream.Send(gnmiSubscribeRequest); err != nil {
+	if err := c.SubscribeClient.Send(gnmiSubscribeRequest); err != nil {
 		log.Fatalf("Failed to send a subscribe request for interface: %v", err)
 	}
 
-	return stream, err
+	return &c, err
 }
 
 // Set does a gNMI Set, given a path and value in gpb TypedValue format
